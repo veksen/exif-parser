@@ -1,37 +1,68 @@
-// also a good reference https://www.scantips.com/lights/fstop2.html
+const exifParser = require("exif").ExifImage;
+const glob = require("glob-promise");
 
-const subSecondStops = [10, 13, 15, 20, 25, 30, 40, 50, 60, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000];
+const Parser = (pattern, cb) => {
+  let output = [];
 
-const findClosest = (arr, search) => {
-  return arr.reduce((prev, curr) => (Math.abs(curr - search) < Math.abs(prev - search) ? curr : prev));
-};
+  const handleImage = async image => {
+    new exifParser({ image }, (error, exifData) => {
+      try {
+        if (error) throw error.message;
 
-const apertureSpeedToHuman = apertureSpeed => {
-  // above 1s
-  if (apertureSpeed >= 1) {
-    return `${apertureSpeed}`;
-  }
+        console.log("c");
+        console.log(image);
 
-  // no remainder, is an integer
-  if ((1 / apertureSpeed) % 1 === 0) {
-    return `1/${1 / apertureSpeed}`;
-  }
+        // console.log(image);
+        const { FocalLengthIn35mmFormat, ExposureTime, ISO, FNumber, LensModel } = exifData.exif;
+        output.push({
+          image,
+          focalLength: FocalLengthIn35mmFormat,
+          apertureSpeed: ExposureTime,
+          apertureLength: FNumber,
+          iso: ISO,
+          lens: LensModel
+        });
+      } catch (err) {
+        console.log(`Error: ${err}`);
+      }
+    });
+  };
 
-  // exact match in our table? use it
-  const rounded = Math.round(1 / apertureSpeed);
-  if (subSecondStops.includes(rounded)) {
-    return `1/${rounded}`;
-  }
+  const handleImages = async images => {
+    for (const image of images) {
+      await handleImage(image);
+    }
 
-  // otherwise attempt for the closest
-  const closest = findClosest(subSecondStops, 1 / apertureSpeed);
-  if (closest) {
-    return `1/${closest}`;
-  }
+    console.log("done?");
+  };
 
-  throw "Error: No match - this should not happen";
+  const run = async () => {
+    console.log("a");
+    const files = await glob.promise(pattern, (err, files) => {
+      if (err) return err;
+
+      console.log("b");
+      files.forEach(image => handleImage(image));
+      console.log("d");
+      console.log(output);
+    });
+
+    console.log("abc");
+
+    console.log("e");
+    console.log(output);
+
+    return output;
+  };
+
+  return {
+    output,
+    run
+  };
 };
 
 module.exports = {
-  apertureSpeedToHuman
+  Parser
 };
+
+Parser("./photos/*.jpg").run();
